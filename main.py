@@ -1,0 +1,175 @@
+import datetime
+import json
+import os
+from datetime import timedelta
+from typing import Final
+
+import discord
+from discord.ext import tasks
+from dotenv import load_dotenv
+load_dotenv()
+
+intents = discord.Intents.default()
+bot = discord.Client(intents=intents)
+tree = discord.app_commands.CommandTree(bot)
+
+REMINDER_DATA_FILE: Final[str] = os.getenv("REMINDER_DATA_FILE", "reminders.json")
+
+
+# -------- データ管理関数 --------
+
+def load_reminders() -> dict:
+    """リマインダー情報をJSONファイルから読み込む関数。ファイルが無い場合は空の辞書を返します。"""
+    if not os.path.exists(REMINDER_DATA_FILE):
+        return {}
+    with open(REMINDER_DATA_FILE, "r") as f:
+        return json.load(f)
+
+
+def save_reminders(reminders: dict):
+    """リマインダー情報をJSONファイルへ保存する関数。"""
+    with open(REMINDER_DATA_FILE, "w") as f:
+        json.dump(reminders, f)
+
+
+# -------- リマインダー管理コマンド --------
+
+vps = discord.app_commands.Group(name="vps", description="VPSの更新リマインダーを管理できます")
+
+
+@vps.command(name="set", description="リマインダーを設定します")
+@discord.app_commands.describe(contract_days="更新期間（日数）", offset="更新日時（UTC）")
+async def set_reminder(interaction: discord.Interaction, contract_days: int, offset: int = 0):
+    """ユーザーのVPS更新リマインダーを設定するスラッシュコマンド。"""
+    user_id = str(interaction.user.id)
+    channel_id = str(interaction.channel.id) if interaction.channel else None
+
+    # リマインダーの日付を計算
+    deadline_date = interaction.created_at.date() + timedelta(days=(contract_days + offset))
+
+    # リマインダーを保存›
+    reminders = load_reminders()
+    reminders[user_id] = {
+        "channel_id": channel_id,
+        "contract_days": contract_days,
+        "deadline_date": deadline_date.isoformat(),
+        "last_reminded": "1970-01-01"
+    }
+    save_reminders(reminders)
+
+    await interaction.response.send_message(
+        f"リマインダーを設定しました。\n"
+        f"**次回更新日** {deadline_date.isoformat()}"
+    )
+
+
+@vps.command(name="show", description="設定されているリマインダーを表示します")
+async def show_reminders(interaction: discord.Interaction):
+    """設定済みのリマインダー内容（次回更新日・更新期間）を返信するスラッシュコマンド。"""
+    user_id = str(interaction.user.id)
+
+    # リマインダーが設定されていない場合
+    reminders = load_reminders()
+    if user_id not in reminders.keys():
+        await interaction.response.send_message("リマインダーが設定されていません。")
+        return
+
+    # リマインダーの日付を表示
+    reminder = reminders[user_id]
+    await interaction.response.send_message(
+        f"**次回更新日** {reminder['deadline_date']}\n"
+        f"**更新期間** {reminder['contract_days']}日"
+    )
+
+
+@vps.command(name="del", description="設定されているリマインダーを削除します")
+async def del_reminder(interaction: discord.Interaction):
+    """設定されているユーザーのリマインダーを削除するスラッシュコマンド。"""
+    user_id = str(interaction.user.id)
+
+    # リマインダーが設定されていない場合
+    reminders = load_reminders()
+    if user_id not in reminders:
+        await interaction.response.send_message("リマインダーが設定されていません。")
+        return
+
+    # リマインダーを削除
+    del reminders[user_id]
+    save_reminders(reminders)
+
+    await interaction.response.send_message("リマインダーを削除しました。")
+
+
+async def send_reminder(user_id: str, channel_id: str, deadline_date: str):
+    """指定されたチャンネルに、ユーザー宛の更新期限リマインドメッセージを送信する関数。"""
+    mention = f"<@{user_id}>"
+    channel = bot.get_channel(int(channel_id))
+    if not channel:
+        return
+    await channel.send(
+        f"{mention} ⚠️ **無料VPSの更新期限が近づいています！** ⚠️\n"
+        f"**次回更新日** {deadline_date}\n"
+        f"ここからログインできます: [ログインページ](https://secure.xserver.ne.jp/xapanel/login/xvps/)"
+    )
+
+
+def should_send_reminder(deadline_date: str, last_reminded_date: str) -> bool:
+    """指定されたユーザーのリマインドメッセージを送信するかどうかを判定する関数。"""
+    today = datetime.date.today()
+    deadline = datetime.date.fromisoformat(deadline_date)
+    last_reminded = datetime.date.fromisoformat(last_reminded_date)
+
+    # 期限が遠い場合はスキップ
+    reminder_days_before = int(os.getenv("REMINDER_DAYS_BEFORE", "1"))
+    if (deadline - today).days > reminder_days_before:
+        return False
+
+    # 今日はもうリマインド済みならスキップ
+    if last_reminded == today:
+        return False
+
+    return True
+
+
+# 1時間ごとにリマインダーをチェック
+@tasks.loop(hours=1)
+async def check_reminders():
+    """1時間ごとに期限を確認し、必要に応じてリマインドを送信・日付更新する定期タスク。"""
+    reminders = load_reminders()
+    for user_id, reminder in reminders.items():
+        if not should_send_reminder(reminder["deadline_date"], reminder["last_reminded"]):
+            continue
+
+        # チャンネルを検索
+        channel_id = reminder["channel_id"]
+        if not channel_id:
+            continue
+
+        # チャンネルにリマインドメッセージを送信
+        await send_reminder(user_id, channel_id, reminder["deadline_date"])
+
+        # 最後にリマインドした日付を更新
+        reminders[user_id]["last_reminded"] = datetime.date.today().isoformat()
+        # リマインダーの日付を更新
+        reminders[user_id]["deadline_date"] = (datetime.date.fromisoformat(reminder["deadline_date"]) + timedelta(
+            days=reminder["contract_days"])).isoformat()
+        save_reminders(reminders)
+
+
+@bot.event
+async def on_ready():
+    """Bot起動時に呼び出されるイベントハンドラー。コマンド同期と定期タスク開始を行います。"""
+    # 起動時に動作する処理
+    print(f"ログインしました: {bot.user} (ID: {bot.user.id})")
+    print("------")
+    await tree.sync()
+
+    # リマインダーチェックループを開始
+    print("リマインダーチェックループを開始します...")
+    check_reminders.start()
+
+
+# -------- 起動処理 --------
+if __name__ == "__main__":
+    tree.add_command(vps)
+    bot.run(os.getenv("DISCORD_BOT_TOKEN"))
