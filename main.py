@@ -2,7 +2,7 @@ import datetime
 import json
 import os
 from datetime import timedelta
-from typing import Final
+from typing import Final, Optional
 
 import discord
 from discord.ext import tasks
@@ -38,14 +38,23 @@ vps = discord.app_commands.Group(name="vps", description="VPSの更新リマイ�
 
 
 @vps.command(name="set", description="リマインダーを設定します")
-@discord.app_commands.describe(contract_days="更新期間（日数）", offset="更新日時（UTC）")
-async def set_reminder(interaction: discord.Interaction, contract_days: int, offset: int = 0):
+@discord.app_commands.describe(contract_days="更新期間（日数）", offset="次の更新日を前後に調整します", next_deadline="次の更新日を直接指定します(yyyy-MM-dd)")
+async def set_reminder(interaction: discord.Interaction, contract_days: int, offset: int = 0, next_deadline: Optional[str] = None):
     """ユーザーのVPS更新リマインダーを設定するスラッシュコマンド。"""
     user_id = str(interaction.user.id)
     channel_id = str(interaction.channel.id) if interaction.channel else None
 
-    # リマインダーの日付を計算
-    deadline_date = interaction.created_at.date() + timedelta(days=(contract_days + offset))
+    if next_deadline:
+        try:
+            # 直接指定した日付を設定
+            deadline_date = datetime.date.fromisoformat(next_deadline)
+        except ValueError:
+            await interaction.response.send_message("⚠️指定された日付が不正です。yyyy-MM-dd形式で入力してください。")
+            return
+    else:
+        # リマインダーの日付を計算
+        today = interaction.created_at.date()
+        deadline_date = today + timedelta(days=(contract_days + offset))
 
     # リマインダーを保存›
     reminders = load_reminders()
