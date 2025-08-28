@@ -13,8 +13,9 @@ intents = discord.Intents.default()
 bot = discord.Client(intents=intents)
 tree = discord.app_commands.CommandTree(bot)
 
+DISCORD_BOT_TOKEN: Final[str] = os.getenv("DISCORD_BOT_TOKEN")
 REMINDER_DATA_FILE: Final[str] = os.getenv("REMINDER_DATA_FILE", "reminders.json")
-
+REMINDER_DAYS_BEFORE: Final[int] = int(os.getenv("REMINDER_DAYS_BEFORE", "1"))
 
 # -------- データ管理関数 --------
 
@@ -129,8 +130,7 @@ def should_send_reminder(deadline_date: str, last_reminded_date: str) -> bool:
     last_reminded = datetime.date.fromisoformat(last_reminded_date)
 
     # 期限が遠い場合はスキップ
-    reminder_days_before = int(os.getenv("REMINDER_DAYS_BEFORE", "1"))
-    if (deadline - today).days > reminder_days_before:
+    if (deadline - today).days > REMINDER_DAYS_BEFORE:
         return False
 
     # 今日はもうリマインド済みならスキップ
@@ -181,4 +181,4 @@ async def on_ready():
 # -------- 起動処理 --------
 if __name__ == "__main__":
     tree.add_command(vps)
-    bot.run(os.getenv("DISCORD_BOT_TOKEN"))
+    bot.run(DISCORD_BOT_TOKEN)
