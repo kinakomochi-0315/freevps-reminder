@@ -123,16 +123,6 @@ wheels = [
 ]
 
 [[package]]
-name = "discord-js"
-version = "1.0.7"
-source = { registry = "https://pypi.org/simple" }
-dependencies = [
-    { name = "discord-py" },
-    { name = "javascriptpy" },
-]
-sdist = { url = "https://files.pythonhosted.org/packages/9b/b0/22fbf7efa7a44797d7407eec1adbaa161bea8cf340c95072265346142301/discord.js-1.0.7.tar.gz", hash = "sha256:9fcc787eeaadea70758097cd8ecb60d47e503779a0f2e7bc8974fcab100d7f4b", size = 1862 }
-
-[[package]]
 name = "discord-py"
 version = "2.6.2"
 source = { registry = "https://pypi.org/simple" }
@@ -150,13 +140,13 @@ name = "freevps-reminder"
 version = "0.1.0"
 source = { virtual = "." }
 dependencies = [
-    { name = "discord-js" },
+    { name = "discord-py" },
     { name = "python-dotenv" },
 ]
 
 [package.metadata]
 requires-dist = [
-    { name = "discord-js", specifier = ">=1.0.7" },
+    { name = "discord-py", specifier = ">=1.0.7" },
     { name = "python-dotenv", specifier = ">=1.1.1" },
 ]
 
@@ -211,12 +201,6 @@ sdist = { url = "https://files.pythonhosted.org/packages/f1/70/7703c29685631f5a7
 wheels = [
     { url = "https://files.pythonhosted.org/packages/76/c6/c88e154df9c4e1a2a66ccf0005a88dfb2650c1dffb6f5ce603dfbd452ce3/idna-3.10-py3-none-any.whl", hash = "sha256:946d195a0d259cbba61165e88e65941f16e9b36ea6ddb97f00452bae8b1287d3", size = 70442 },
 ]
-
-[[package]]
-name = "javascriptpy"
-version = "1.1.6"
-source = { registry = "https://pypi.org/simple" }
-sdist = { url = "https://files.pythonhosted.org/packages/12/8f/00d62415bb59ad134be3c852f10544c090021148270a290e5149b2d7ef41/javascriptpy-1.1.6.tar.gz", hash = "sha256:2c00a33c2097fc98ee21b572980ade0d4ac49195e386e19fe08cfaf7d00742c2", size = 8108 }
 
 [[package]]
 name = "multidict"
