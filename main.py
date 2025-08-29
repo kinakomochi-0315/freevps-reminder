@@ -17,6 +17,7 @@ DISCORD_BOT_TOKEN: Final[str] = os.getenv("DISCORD_BOT_TOKEN")
 REMINDER_DATA_FILE: Final[str] = os.getenv("REMINDER_DATA_FILE", "reminders.json")
 REMINDER_DAYS_BEFORE: Final[int] = int(os.getenv("REMINDER_DAYS_BEFORE", "1"))
 
+
 # -------- データ管理関数 --------
 
 def load_reminders() -> dict:
@@ -39,8 +40,10 @@ vps = discord.app_commands.Group(name="vps", description="VPSの更新リマイ�
 
 
 @vps.command(name="set", description="リマインダーを設定します")
-@discord.app_commands.describe(contract_days="更新期間（日数）", offset="次の更新日を前後に調整します", next_deadline="次の更新日を直接指定します(yyyy-MM-dd)")
-async def set_reminder(interaction: discord.Interaction, contract_days: int, offset: int = 0, next_deadline: Optional[str] = None):
+@discord.app_commands.describe(contract_days="更新期間（日数）", offset="次の更新日を前後に調整します",
+                               next_deadline="次の更新日を直接指定します(yyyy-MM-dd)")
+async def set_reminder(interaction: discord.Interaction, contract_days: int, offset: int = 0,
+                       next_deadline: Optional[str] = None):
     """ユーザーのVPS更新リマインダーを設定するスラッシュコマンド。"""
     user_id = str(interaction.user.id)
     channel_id = str(interaction.channel.id) if interaction.channel else None
@@ -63,7 +66,8 @@ async def set_reminder(interaction: discord.Interaction, contract_days: int, off
         "channel_id": channel_id,
         "contract_days": contract_days,
         "deadline_date": deadline_date.isoformat(),
-        "last_reminded": "1970-01-01"
+        "last_reminded": "1970-01-01",
+        "reminder_message_id": None,
     }
     save_reminders(reminders)
 
@@ -110,13 +114,15 @@ async def del_reminder(interaction: discord.Interaction):
     await interaction.response.send_message("リマインダーを削除しました。")
 
 
-async def send_reminder(user_id: str, channel_id: str, deadline_date: str):
+async def send_reminder(user_id: str, channel_id: str, deadline_date: str) -> Optional[discord.Message]:
     """指定されたチャンネルに、ユーザー宛の更新期限リマインドメッセージを送信する関数。"""
     mention = f"<@{user_id}>"
     channel = bot.get_channel(int(channel_id))
+
     if not channel:
-        return
-    await channel.send(
+        return None
+
+    return await channel.send(
         f"{mention} ⚠️ **無料VPSの更新期限が近づいています！** ⚠️\n"
         f"**次回更新日** {deadline_date}\n"
         f"ここからログインできます: [ログインページ](https://secure.xserver.ne.jp/xapanel/login/xvps/)"
@@ -155,14 +161,43 @@ async def check_reminders():
             continue
 
         # チャンネルにリマインドメッセージを送信
-        await send_reminder(user_id, channel_id, reminder["deadline_date"])
+        message = await send_reminder(user_id, channel_id, reminder["deadline_date"])
+
+        if not message:
+            continue
 
         # 最後にリマインドした日付を更新
         reminders[user_id]["last_reminded"] = datetime.date.today().isoformat()
-        # リマインダーの日付を更新
-        reminders[user_id]["deadline_date"] = (datetime.date.fromisoformat(reminder["deadline_date"]) + timedelta(
-            days=reminder["contract_days"])).isoformat()
+        reminders[user_id]["reminder_message_id"] = message.id
         save_reminders(reminders)
+
+
+@bot.event
+async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
+    """リアクションが追加されたときに呼び出されるイベントハンドラー"""
+    # BOTの場合はスキップ
+    if user.bot:
+        return
+
+    # このbotによるメッセージに対するリアクションのみを受け付ける
+    if not reaction.message.author.id == bot.user.id:
+        return
+
+    message_id = str(reaction.message.id)
+    user_id = str(user.id)
+    reminders = load_reminders()
+
+    for reminder_user_id, reminder in reminders.items():
+        # リマインドメッセージにリアクションが付いたら、リマインドを終了し更新期限を延長
+        if message_id == reminder["reminder_message_id"] and user_id == reminder_user_id:
+            reminders[reminder_user_id]["reminder_message_id"] = None
+
+            # 更新期限を更新
+            contract_days: int = reminder["contract_days"]
+            deadline_date: datetime.date = datetime.date.fromisoformat(reminder["deadline_date"])
+            reminders[reminder_user_id]["deadline_date"] = (deadline_date + timedelta(days=contract_days)).isoformat()
+
+            save_reminders(reminders)
 
 
 @bot.event
