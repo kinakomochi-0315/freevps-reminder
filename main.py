@@ -23,6 +23,7 @@ logging.basicConfig(
 logger = logging.getLogger("freevps-reminder")
 
 intents = discord.Intents.default()
+intents.reactions = True
 bot = discord.Client(intents=intents)
 tree = discord.app_commands.CommandTree(bot)
 
@@ -95,7 +96,8 @@ async def set_reminder(interaction: discord.Interaction, contract_days: int, off
         "reminder_message_id": None,
     }
     save_reminders(reminders)
-    logger.info("リマインダーを設定しました。user_id=%s 次回更新日=%s 期間=%d日", user_id, deadline_date.isoformat(), contract_days)
+    logger.info("リマインダーを設定しました。user_id=%s 次回更新日=%s 期間=%d日", user_id, deadline_date.isoformat(),
+                contract_days)
 
     await interaction.response.send_message(
         f"リマインダーを設定しました。\n"
@@ -117,7 +119,8 @@ async def show_reminders(interaction: discord.Interaction):
 
     # リマインダーの日付を表示
     reminder = reminders[user_id]
-    logger.info("リマインダー情報を表示します。user_id=%s 締切=%s 期間=%s日", user_id, reminder['deadline_date'], reminder['contract_days'])
+    logger.info("リマインダー情報を表示します。user_id=%s 締切=%s 期間=%s日", user_id, reminder['deadline_date'],
+                reminder['contract_days'])
     await interaction.response.send_message(
         f"**次回更新日** {reminder['deadline_date']}\n"
         f"**更新期間** {reminder['contract_days']}日"
@@ -160,7 +163,8 @@ async def send_reminder(user_id: str, channel_id: str, deadline_date: str) -> Op
             "ここからログインできます: [ログインページ](https://secure.xserver.ne.jp/xapanel/login/xvps/)"
             "-# 契約更新を行ったら、このメッセージにリアクションをつけてください。"
         )
-        logger.info("リマインドメッセージを送信しました。user_id=%s channel_id=%s message_id=%s", user_id, channel_id, message.id)
+        logger.info("リマインドメッセージを送信しました。user_id=%s channel_id=%s message_id=%s", user_id, channel_id,
+                    message.id)
         return message
     except Exception:
         logger.exception("リマインドメッセージの送信に失敗しました。user_id=%s channel_id=%s", user_id, channel_id)
@@ -249,7 +253,8 @@ async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
             reminders[reminder_user_id]["deadline_date"] = (deadline_date + timedelta(days=contract_days)).isoformat()
 
             save_reminders(reminders)
-            logger.info("リアクションを検知し、期限を延長しました。user_id=%s 新しい締切=%s", reminder_user_id, reminders[reminder_user_id]["deadline_date"])
+            logger.info("リアクションを検知し、期限を延長しました。user_id=%s 新しい締切=%s", reminder_user_id,
+                        reminders[reminder_user_id]["deadline_date"])
 
 
 @bot.event
