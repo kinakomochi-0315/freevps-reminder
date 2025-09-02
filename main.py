@@ -168,7 +168,7 @@ async def check_reminders():
 
         # 最後にリマインドした日付を更新
         reminders[user_id]["last_reminded"] = datetime.date.today().isoformat()
-        reminders[user_id]["reminder_message_id"] = message.id
+        reminders[user_id]["reminder_message_id"] = str(message.id)
         save_reminders(reminders)
 
 
