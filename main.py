@@ -147,6 +147,35 @@ async def del_reminder(interaction: discord.Interaction):
     await interaction.response.send_message("リマインダーを削除しました。")
 
 
+@vps.command(name="update", description="設定されているリマインダーを更新します")
+async def update_reminder(interaction: discord.Interaction):
+    """設定されているユーザーのリマインダーを更新するスラッシュコマンド。"""
+    user_id = str(interaction.user.id)
+
+    # リマインダーが設定されていない場合
+    reminders = load_reminders()
+    if user_id not in reminders:
+        logger.warning("削除要求がありましたが、リマインダーは未設定です。user_id=%s", user_id)
+        await interaction.response.send_message("リマインダーが設定されていません。")
+        return
+
+    # リマインダーを更新
+    reminders[user_id]["reminder_message_id"] = None
+
+    # 更新期限を更新
+    contract_days: int = reminders[user_id]["contract_days"]
+    deadline_date: datetime.date = datetime.date.fromisoformat(reminders[user_id]["deadline_date"])
+    reminders[user_id]["deadline_date"] = (deadline_date + timedelta(days=contract_days)).isoformat()
+
+    save_reminders(reminders)
+    await interaction.response.send_message(
+        "リマインダーを更新しました。"
+        f"**次回更新日** {reminders[user_id]['deadline_date']}"
+    )
+    logger.info("リマインド期限を延長しました。user_id=%s 新しい締切=%s", user_id,
+                reminders[user_id]["deadline_date"])
+
+
 async def send_reminder(user_id: str, channel_id: str, deadline_date: str) -> Optional[discord.Message]:
     """指定されたチャンネルに、ユーザー宛の更新期限リマインドメッセージを送信する関数。"""
     mention = f"<@{user_id}>"
