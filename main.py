@@ -222,12 +222,16 @@ async def check_reminders():
 @bot.event
 async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
     """リアクションが追加されたときに呼び出されるイベントハンドラー"""
+    logger.info("リアクションが追加されました。user_id=%s message_id=%s", user.id, reaction.message.id)
+
     # BOTの場合はスキップ
     if user.bot:
+        logger.warning("リアクションをつけたのがBOTだったためスキップします。")
         return
 
     # このbotによるメッセージに対するリアクションのみを受け付ける
     if not reaction.message.author.id == bot.user.id:
+        logger.warning("このbotによるメッセージに対するリアクションではないのでスキップします。")
         return
 
     message_id = str(reaction.message.id)
