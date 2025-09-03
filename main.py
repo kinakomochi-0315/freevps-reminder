@@ -189,7 +189,7 @@ async def send_reminder(user_id: str, channel_id: str, deadline_date: str) -> Op
         message = await channel.send(
             f"{mention} ⚠️ **無料VPSの更新期限が近づいています！** ⚠️\n"
             f"**次回更新日** {deadline_date}\n"
-            "ここからログインできます: [ログインページ](https://secure.xserver.ne.jp/xapanel/login/xvps/)"
+            "ここからログインできます: [ログインページ](https://secure.xserver.ne.jp/xapanel/login/xvps/)\n"
             "-# 契約更新を行ったら、このメッセージにリアクションをつけてください。"
         )
         logger.info("リマインドメッセージを送信しました。user_id=%s channel_id=%s message_id=%s", user_id, channel_id,
