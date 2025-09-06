@@ -285,6 +285,11 @@ async def on_reaction_add(reaction: discord.Reaction, user: discord.User):
             logger.info("リアクションを検知し、期限を延長しました。user_id=%s 新しい締切=%s", reminder_user_id,
                         reminders[reminder_user_id]["deadline_date"])
 
+            # リマインドメッセージを編集
+            before_content = reaction.message.content
+            after_content = before_content + "\n" + f"🎉契約更新、お疲れ様です！🎉 **次の更新日** {reminders[reminder_user_id]['deadline_date']}"
+            await reaction.message.edit(content=after_content)
+
 
 @bot.event
 async def on_ready():
